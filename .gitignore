@@ -1,0 +1,51 @@
+# IntelliJ IDEA
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# VS Code
+.vscode/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Environment files / secrets
+.env
+.env.*
+!.env.example
+
+# Gradle
+.gradle/
+build/
+*/build/
+
+# Java
+out/
+target/
+
+# Node / Vite frontend
+node_modules/
+dist/
+frontend/node_modules/
+frontend/dist/
+
+# Coverage
+coverage/
+
+# Temporary files
+*.tmp
+*.temp
+
+# Podman / Docker local files
+*.pid
+
+# PostgreSQL local data if you ever create a mounted db folder
+postgres-data/
+db-data/
+data/

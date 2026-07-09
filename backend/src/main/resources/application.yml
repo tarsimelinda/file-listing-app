@@ -1,0 +1,17 @@
+server:
+  port: 8080
+
+app:
+  input-root: ${APP_INPUT_ROOT:/input}
+
+spring:
+  datasource:
+    url: jdbc:postgresql://[::1]:5433/filedb
+    username: fileuser
+    password: filepass
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+    show-sql: true
