@@ -6,12 +6,16 @@ app:
 
 spring:
   datasource:
-    url: jdbc:postgresql://[::1]:5433/filedb
-    username: fileuser
-    password: filepass
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://[::1]:5433/filedb}
+    username: ${SPRING_DATASOURCE_USERNAME:fileuser}
+    password: ${SPRING_DATASOURCE_PASSWORD:filepass}
 
   jpa:
     hibernate:
       ddl-auto: update
     open-in-view: false
     show-sql: true
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
