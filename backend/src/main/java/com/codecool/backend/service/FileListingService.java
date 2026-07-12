@@ -30,7 +30,9 @@ public class FileListingService {
         collectFiles(startPath, files, normalizedExtension);
 
         return files.stream()
-                .map(path -> path.getFileName().toString())
+                .map(startPath::relativize)
+                .map(Path::toString)
+                .map(path -> path.replace("\\", "/"))
                 .toList();
     }
 
