@@ -1,6 +1,6 @@
 import './style.css';
 
-const API_BASE_URL = 'http://localhost:8080';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080';
 
 type FileListResponse = {
   requestedPath: string;
@@ -112,89 +112,100 @@ listButton.addEventListener('click', listFiles);
 historyButton.addEventListener('click', loadHistory);
 
 async function generateStructure(): Promise<void> {
-  const basePath = getInputValue('generateBasePath');
-  const depth = Number(getInputValue('depth'));
-  const filesPerDirectory = Number(getInputValue('filesPerDirectory'));
-  const extension = getInputValue('generateExtension');
+  try {
+    const basePath = getInputValue('generateBasePath');
+    const depth = Number(getInputValue('depth'));
+    const filesPerDirectory = Number(getInputValue('filesPerDirectory'));
+    const extension = getInputValue('generateExtension');
 
-  const response = await fetch(`${API_BASE_URL}/api/generate`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      basePath,
-      depth,
-      filesPerDirectory,
-      extension
-    })
-  });
+    const response = await fetch(`${API_BASE_URL}/api/generate`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        basePath,
+        depth,
+        filesPerDirectory,
+        extension
+      })
+    });
 
-  if (!response.ok) {
-    showError('generateResult', await response.text());
-    return;
+    if (!response.ok) {
+      showError('generateResult', await response.text());
+      return;
+    }
+
+    const data: GenerateResponse = await response.json();
+
+    document.querySelector<HTMLPreElement>('#generateResult')!.textContent =
+      JSON.stringify(data, null, 2);
+  } catch (error) {
+    showError('generateResult', String(error));
   }
-
-  const data: GenerateResponse = await response.json();
-
-  document.querySelector<HTMLPreElement>('#generateResult')!.textContent =
-    JSON.stringify(data, null, 2);
 }
 
 async function listFiles(): Promise<void> {
-  const path = encodeURIComponent(getInputValue('listPath'));
-  const extension = encodeURIComponent(getInputValue('listExtension'));
+  try {
+    const path = encodeURIComponent(getInputValue('listPath'));
+    const extension = encodeURIComponent(getInputValue('listExtension'));
 
-  const response = await fetch(`${API_BASE_URL}/api/list?path=${path}&extension=${extension}`);
+    const response = await fetch(`${API_BASE_URL}/api/list?path=${path}&extension=${extension}`);
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    document.querySelector<HTMLParagraphElement>('#fileCount')!.textContent = errorText;
-    return;
+    if (!response.ok) {
+      const errorText = await response.text();
+      document.querySelector<HTMLParagraphElement>('#fileCount')!.textContent = errorText;
+      return;
+    }
+
+    const data: FileListResponse = await response.json();
+
+    document.querySelector<HTMLParagraphElement>('#fileCount')!.textContent =
+      `Found files: ${data.count}`;
+
+    const fileList = document.querySelector<HTMLUListElement>('#fileList')!;
+    fileList.replaceChildren();
+
+    data.files.forEach((file) => {
+      const listItem = document.createElement('li');
+      listItem.textContent = file;
+      fileList.appendChild(listItem);
+    });
+  } catch (error) {
+    document.querySelector<HTMLParagraphElement>('#fileCount')!.textContent = String(error);
   }
-
-  const data: FileListResponse = await response.json();
-
-  document.querySelector<HTMLParagraphElement>('#fileCount')!.textContent =
-    `Found files: ${data.count}`;
-
-  const fileList = document.querySelector<HTMLUListElement>('#fileList')!;
-  fileList.innerHTML = '';
-
-  data.files.forEach((file) => {
-    const listItem = document.createElement('li');
-    listItem.textContent = file;
-    fileList.appendChild(listItem);
-  });
 }
 
 async function loadHistory(): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/api/history`);
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/history`);
 
-  if (!response.ok) {
-    return;
+    if (!response.ok) {
+      showError('fileCount', await response.text());
+      return;
+    }
+
+    const history: HistoryItem[] = await response.json();
+
+    const tableBody = document.querySelector<HTMLTableSectionElement>('#historyTableBody')!;
+    tableBody.replaceChildren();
+
+    history.forEach((item) => {
+      const row = document.createElement('tr');
+
+      appendTableCell(row, item.id);
+      appendTableCell(row, item.runUser);
+      appendTableCell(row, item.requestedPath);
+      appendTableCell(row, item.extension);
+      appendTableCell(row, item.resultCount);
+      appendTableCell(row, item.status);
+      appendTableCell(row, item.requestedAt);
+
+      tableBody.appendChild(row);
+    });
+  } catch (error) {
+    showError('fileCount', String(error));
   }
-
-  const history: HistoryItem[] = await response.json();
-
-  const tableBody = document.querySelector<HTMLTableSectionElement>('#historyTableBody')!;
-  tableBody.innerHTML = '';
-
-  history.forEach((item) => {
-    const row = document.createElement('tr');
-
-    row.innerHTML = `
-      <td>${item.id}</td>
-      <td>${item.runUser}</td>
-      <td>${item.requestedPath}</td>
-      <td>${item.extension}</td>
-      <td>${item.resultCount}</td>
-      <td>${item.status}</td>
-      <td>${item.requestedAt}</td>
-    `;
-
-    tableBody.appendChild(row);
-  });
 }
 
 function getInputValue(id: string): string {
@@ -203,4 +214,10 @@ function getInputValue(id: string): string {
 
 function showError(elementId: string, message: string): void {
   document.querySelector<HTMLElement>(`#${elementId}`)!.textContent = message;
+}
+
+function appendTableCell(row: HTMLTableRowElement, value: string | number): void {
+  const cell = document.createElement('td');
+  cell.textContent = String(value);
+  row.appendChild(cell);
 }
