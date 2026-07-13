@@ -8,6 +8,8 @@ import org.springframework.stereotype.Service;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Comparator;
+import java.util.stream.Stream;
 
 @Service
 public class FileGenerationService {
@@ -30,6 +32,7 @@ public class FileGenerationService {
         int createdFiles = 0;
 
         try {
+            deleteDirectoryIfExists(generatedRoot);
             Files.createDirectories(generatedRoot);
 
             Path currentPath = generatedRoot;
@@ -62,6 +65,23 @@ public class FileGenerationService {
             );
         } catch (IOException e) {
             throw new IllegalStateException("Failed to generate file structure under: " + request.basePath(), e);
+        }
+    }
+
+    private void deleteDirectoryIfExists(Path directory) throws IOException {
+        if (!Files.exists(directory)) {
+            return;
+        }
+
+        try (Stream<Path> paths = Files.walk(directory)) {
+            paths.sorted(Comparator.reverseOrder())
+                    .forEach(path -> {
+                        try {
+                            Files.delete(path);
+                        } catch (IOException e) {
+                            throw new IllegalStateException("Failed to delete path: " + path, e);
+                        }
+                    });
         }
     }
 
