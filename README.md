@@ -47,7 +47,7 @@ file-listing-app/
 │   ├── package.json
 │   └── src/
 ├── input/
-│   └── sample files and generated file structures
+│   └── sample files, generated files are created here at runtime
 ├── Makefile
 └── README.md
 ```
@@ -265,6 +265,12 @@ The history stores:
 * result count
 * status
 
+The status can be:
+
+- `SUCCESS` for successful file listing requests
+- `GENERATED` for successful file generation requests
+- `FAILED` for failed generation or listing requests
+
 ## Database
 
 The PostgreSQL database is created automatically when the database container starts.
@@ -341,3 +347,21 @@ This starts all required containers and makes the application available at:
 ```text
 http://localhost:3000
 ```
+
+## Error handling
+
+Invalid requests return a structured JSON error response.
+
+Example:
+
+```json
+{
+  "message": "Path does not exist: /wrong",
+  "status": 400,
+  "error": "Bad Request",
+  "timestamp": "2026-07-13T10:30:00"
+}
+```
+
+Failed list and generate requests are also stored in the query history with FAILED status.
+
