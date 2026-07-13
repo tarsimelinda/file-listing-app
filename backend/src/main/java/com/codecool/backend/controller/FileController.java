@@ -36,34 +36,56 @@ public class FileController {
             @RequestParam String path,
             @RequestParam(required = false, defaultValue = "") String extension
     ) {
-        List<String> files = fileListingService.listFiles(path, extension);
+        try {
+            List<String> files = fileListingService.listFiles(path, extension);
 
-        historyService.saveHistory(
-                path,
-                extension,
-                files.size(),
-                "SUCCESS"
-        );
+            historyService.saveHistory(
+                    path,
+                    extension,
+                    files.size(),
+                    "SUCCESS"
+            );
 
-        return new FileListResponse(
-                path,
-                extension,
-                files,
-                files.size()
-        );
+            return new FileListResponse(
+                    path,
+                    extension,
+                    files,
+                    files.size()
+            );
+        } catch (RuntimeException exception) {
+            historyService.saveHistory(
+                    path,
+                    extension,
+                    0,
+                    "FAILED"
+            );
+
+            throw exception;
+        }
     }
 
     @PostMapping("/api/generate")
     public GenerateResponse generate(@RequestBody GenerateRequest request) {
-        GenerateResponse response = fileGenerationService.generate(request);
+        try {
+            GenerateResponse response = fileGenerationService.generate(request);
 
-        historyService.saveHistory(
-                request.basePath(),
-                request.extension(),
-                response.createdFiles(),
-                "GENERATED"
-        );
+            historyService.saveHistory(
+                    request.basePath(),
+                    request.extension(),
+                    response.createdFiles(),
+                    "GENERATED"
+            );
 
-        return response;
+            return response;
+        } catch (RuntimeException exception) {
+            historyService.saveHistory(
+                    request.basePath(),
+                    request.extension(),
+                    0,
+                    "FAILED"
+            );
+
+            throw exception;
+        }
     }
 }
