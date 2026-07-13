@@ -41,11 +41,8 @@ public class FileGenerationService {
                 String directoryName = toAlphabeticName(level);
 
                 currentPath = currentPath.resolve(directoryName).normalize();
-
-                if (!Files.exists(currentPath)) {
-                    Files.createDirectories(currentPath);
-                    createdDirectories++;
-                }
+                Files.createDirectories(currentPath);
+                createdDirectories++;
 
                 for (int fileNumber = 1; fileNumber <= request.filesPerDirectory(); fileNumber++) {
                     String fileName = fileNumber + "." + extension;
@@ -127,6 +124,12 @@ public class FileGenerationService {
             return "txt";
         }
 
-        return extension.trim().replaceFirst("^\\.", "");
+        String normalizedExtension = extension.trim().replaceFirst("^\\.", "");
+
+        if (normalizedExtension.contains("/") || normalizedExtension.contains("\\")) {
+            throw new IllegalArgumentException("Extension must not contain path separators.");
+        }
+
+        return normalizedExtension;
     }
 }

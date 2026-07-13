@@ -21,6 +21,8 @@ public class FileListingService {
     }
 
     public List<String> listFiles(String requestedPath, String extension) {
+        validateRequest(requestedPath);
+
         Path startPath = resolveAndValidatePath(requestedPath);
 
         String normalizedExtension = normalizeExtension(extension);
@@ -54,6 +56,12 @@ public class FileListingService {
         return resolvedPath;
     }
 
+    private void validateRequest(String requestedPath) {
+        if (requestedPath == null || requestedPath.isBlank()) {
+            throw new IllegalArgumentException("Path must not be empty.");
+        }
+    }
+
     private void collectFiles(Path currentPath, Set<Path> files, String extension) {
         try (DirectoryStream<Path> entries = Files.newDirectoryStream(currentPath)) {
             for (Path entry : entries) {
@@ -83,6 +91,12 @@ public class FileListingService {
             return "";
         }
 
-        return extension.trim().replaceFirst("^\\.", "");
+        String normalizedExtension = extension.trim().replaceFirst("^\\.", "");
+
+        if (normalizedExtension.contains("/") || normalizedExtension.contains("\\")) {
+            throw new IllegalArgumentException("Extension must not contain path separators.");
+        }
+
+        return normalizedExtension;
     }
 }
