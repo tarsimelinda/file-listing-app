@@ -14,6 +14,9 @@ import java.util.stream.Stream;
 @Service
 public class FileGenerationService {
 
+    private static final int MAX_DEPTH = 100;
+    private static final int MAX_FILES_PER_DIRECTORY = 20;
+
     private final Path inputRoot;
 
     public FileGenerationService(@Value("${app.input-root}") String inputRoot) {
@@ -93,6 +96,14 @@ public class FileGenerationService {
 
         if (request.filesPerDirectory() < 0) {
             throw new IllegalArgumentException("Files per directory cannot be negative.");
+        }
+
+        if (request.depth() > MAX_DEPTH) {
+            throw new IllegalArgumentException("Depth must not be greater than " + MAX_DEPTH + ".");
+        }
+
+        if (request.filesPerDirectory() > MAX_FILES_PER_DIRECTORY) {
+            throw new IllegalArgumentException("Files per directory must not be greater than " + MAX_FILES_PER_DIRECTORY + ".");
         }
     }
 
