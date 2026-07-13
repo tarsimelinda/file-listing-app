@@ -84,7 +84,7 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
       <h2>History</h2>
 
       <button id="historyButton">Load history</button>
-
+      <p id="historyError"></p>
       <table>
         <thead>
           <tr>
@@ -181,7 +181,7 @@ async function loadHistory(): Promise<void> {
     const response = await fetch(`${API_BASE_URL}/api/history`);
 
     if (!response.ok) {
-      showError('fileCount', await response.text());
+      showError('historyError', await response.text());
       return;
     }
 
@@ -204,7 +204,7 @@ async function loadHistory(): Promise<void> {
       tableBody.appendChild(row);
     });
   } catch (error) {
-    showError('fileCount', String(error));
+    showError('historyError', String(error));
   }
 }
 
