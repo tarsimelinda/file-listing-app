@@ -39,21 +39,22 @@ public class FileListingService {
     }
 
     private Path resolveAndValidatePath(String requestedPath) {
-        Path resolvedPath = Path.of(requestedPath).toAbsolutePath().normalize();
+        try {
+            Path realInputRoot = inputRoot.toRealPath().normalize();
+            Path resolvedPath = Path.of(requestedPath).toRealPath().normalize();
 
-        if (!resolvedPath.startsWith(inputRoot)) {
-            throw new IllegalArgumentException("Path must be under input root: " + inputRoot);
+            if (!resolvedPath.startsWith(realInputRoot)) {
+                throw new IllegalArgumentException("Path must be under input root: " + realInputRoot);
+            }
+
+            if (!Files.isDirectory(resolvedPath)) {
+                throw new IllegalArgumentException("Path is not a directory: " + requestedPath);
+            }
+
+            return resolvedPath;
+        } catch (IOException e) {
+            throw new IllegalArgumentException("Path does not exist or cannot be accessed: " + requestedPath);
         }
-
-        if (!Files.exists(resolvedPath)) {
-            throw new IllegalArgumentException("Path does not exist: " + requestedPath);
-        }
-
-        if (!Files.isDirectory(resolvedPath)) {
-            throw new IllegalArgumentException("Path is not a directory: " + requestedPath);
-        }
-
-        return resolvedPath;
     }
 
     private void validateRequest(String requestedPath) {

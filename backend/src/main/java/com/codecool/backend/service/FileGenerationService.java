@@ -114,6 +114,14 @@ public class FileGenerationService {
             throw new IllegalArgumentException("Base path must be under input root: " + inputRoot);
         }
 
+        if (!Files.exists(resolvedBasePath)) {
+            throw new IllegalArgumentException("Base path does not exist: " + requestedBasePath);
+        }
+
+        if (!Files.isDirectory(resolvedBasePath)) {
+            throw new IllegalArgumentException("Base path is not a directory: " + requestedBasePath);
+        }
+
         return resolvedBasePath;
     }
 
