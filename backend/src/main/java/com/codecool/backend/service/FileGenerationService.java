@@ -23,6 +23,13 @@ public class FileGenerationService {
         this.inputRoot = Path.of(inputRoot).toAbsolutePath().normalize();
     }
 
+    /**
+     * Generates a deep directory structure under the requested base path.
+     * The previous generated structure is removed before creating the new one.
+     *
+     * @param request generation parameters including base path, depth, files per directory and extension
+     * @return summary of the generated directory structure
+     */
     public GenerateResponse generate(GenerateRequest request) {
         validateRequest(request);
 

@@ -20,6 +20,13 @@ public class FileListingService {
         this.inputRoot = Path.of(inputRoot).toAbsolutePath().normalize();
     }
 
+    /**
+     * Recursively lists files under the requested directory and filters them by extension.
+     *
+     * @param requestedPath the directory path to search under
+     * @param extension optional file extension filter without or with leading dot
+     * @return sorted relative file paths matching the requested extension
+     */
     public List<String> listFiles(String requestedPath, String extension) {
         validateRequest(requestedPath);
 
