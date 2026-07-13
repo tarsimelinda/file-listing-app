@@ -49,3 +49,5 @@ coverage/
 postgres-data/
 db-data/
 data/
+
+input/generated/
