@@ -1,5 +1,6 @@
 package com.codecool.backend.service;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -13,16 +14,14 @@ import java.util.Set;
 @Service
 public class FileListingService {
 
+    private final Path inputRoot;
+
+    public FileListingService(@Value("${app.input-root}") String inputRoot) {
+        this.inputRoot = Path.of(inputRoot).toAbsolutePath().normalize();
+    }
+
     public List<String> listFiles(String requestedPath, String extension) {
-        Path startPath = Path.of(requestedPath).normalize();
-
-        if (!Files.exists(startPath)) {
-            throw new IllegalArgumentException("Path does not exist: " + requestedPath);
-        }
-
-        if (!Files.isDirectory(startPath)) {
-            throw new IllegalArgumentException("Path is not a directory: " + requestedPath);
-        }
+        Path startPath = resolveAndValidatePath(requestedPath);
 
         String normalizedExtension = normalizeExtension(extension);
 
@@ -33,7 +32,26 @@ public class FileListingService {
                 .map(startPath::relativize)
                 .map(Path::toString)
                 .map(path -> path.replace("\\", "/"))
+                .sorted()
                 .toList();
+    }
+
+    private Path resolveAndValidatePath(String requestedPath) {
+        Path resolvedPath = Path.of(requestedPath).toAbsolutePath().normalize();
+
+        if (!resolvedPath.startsWith(inputRoot)) {
+            throw new IllegalArgumentException("Path must be under input root: " + inputRoot);
+        }
+
+        if (!Files.exists(resolvedPath)) {
+            throw new IllegalArgumentException("Path does not exist: " + requestedPath);
+        }
+
+        if (!Files.isDirectory(resolvedPath)) {
+            throw new IllegalArgumentException("Path is not a directory: " + requestedPath);
+        }
+
+        return resolvedPath;
     }
 
     private void collectFiles(Path currentPath, Set<Path> files, String extension) {

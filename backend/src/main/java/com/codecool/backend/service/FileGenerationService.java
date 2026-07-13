@@ -2,6 +2,7 @@ package com.codecool.backend.service;
 
 import com.codecool.backend.dto.GenerateRequest;
 import com.codecool.backend.dto.GenerateResponse;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -11,19 +12,19 @@ import java.nio.file.Path;
 @Service
 public class FileGenerationService {
 
-    public GenerateResponse generate(GenerateRequest request) {
-        if (request.depth() <= 0) {
-            throw new IllegalArgumentException("Depth must be greater than zero.");
-        }
+    private final Path inputRoot;
 
-        if (request.filesPerDirectory() < 0) {
-            throw new IllegalArgumentException("Files per directory cannot be negative.");
-        }
+    public FileGenerationService(@Value("${app.input-root}") String inputRoot) {
+        this.inputRoot = Path.of(inputRoot).toAbsolutePath().normalize();
+    }
+
+    public GenerateResponse generate(GenerateRequest request) {
+        validateRequest(request);
 
         String extension = normalizeExtension(request.extension());
 
-        Path basePath = Path.of(request.basePath()).normalize();
-        Path generatedRoot = basePath.resolve("generated");
+        Path basePath = resolveAndValidateBasePath(request.basePath());
+        Path generatedRoot = basePath.resolve("generated").normalize();
 
         int createdDirectories = 0;
         int createdFiles = 0;
@@ -36,13 +37,16 @@ public class FileGenerationService {
             for (int level = 1; level <= request.depth(); level++) {
                 String directoryName = toAlphabeticName(level);
 
-                currentPath = currentPath.resolve(directoryName);
-                Files.createDirectories(currentPath);
-                createdDirectories++;
+                currentPath = currentPath.resolve(directoryName).normalize();
+
+                if (!Files.exists(currentPath)) {
+                    Files.createDirectories(currentPath);
+                    createdDirectories++;
+                }
 
                 for (int fileNumber = 1; fileNumber <= request.filesPerDirectory(); fileNumber++) {
-                    String fileName = level + "." + extension;
-                    Path filePath = currentPath.resolve(fileName);
+                    String fileName = fileNumber + "." + extension;
+                    Path filePath = currentPath.resolve(fileName).normalize();
 
                     Files.writeString(filePath, "Generated file: " + fileName);
                     createdFiles++;
@@ -59,6 +63,30 @@ public class FileGenerationService {
         } catch (IOException e) {
             throw new IllegalStateException("Failed to generate file structure under: " + request.basePath(), e);
         }
+    }
+
+    private void validateRequest(GenerateRequest request) {
+        if (request.basePath() == null || request.basePath().isBlank()) {
+            throw new IllegalArgumentException("Base path must not be empty.");
+        }
+
+        if (request.depth() <= 0) {
+            throw new IllegalArgumentException("Depth must be greater than zero.");
+        }
+
+        if (request.filesPerDirectory() < 0) {
+            throw new IllegalArgumentException("Files per directory cannot be negative.");
+        }
+    }
+
+    private Path resolveAndValidateBasePath(String requestedBasePath) {
+        Path resolvedBasePath = Path.of(requestedBasePath).toAbsolutePath().normalize();
+
+        if (!resolvedBasePath.startsWith(inputRoot)) {
+            throw new IllegalArgumentException("Base path must be under input root: " + inputRoot);
+        }
+
+        return resolvedBasePath;
     }
 
     private String toAlphabeticName(int number) {
