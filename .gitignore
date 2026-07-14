@@ -50,4 +50,4 @@ postgres-data/
 db-data/
 data/
 
-input/generated/
+input/**/generated/
