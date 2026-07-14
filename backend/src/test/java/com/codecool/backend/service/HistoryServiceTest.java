@@ -1,5 +1,6 @@
 package com.codecool.backend.service;
 
+import com.codecool.backend.dto.HistoryResponse;
 import com.codecool.backend.entity.QueryHistory;
 import com.codecool.backend.repository.QueryHistoryRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -38,10 +39,12 @@ class HistoryServiceTest {
     void saveHistoryShouldCreateAndSaveQueryHistory() {
         when(runningUserProvider.getRunUser())
                 .thenReturn("test-user");
+
         when(runningUserProvider.getRunUid())
                 .thenReturn("1000");
+
         when(runningUserProvider.getRunGid())
-                .thenReturn("1000");
+                .thenReturn("1001");
 
         when(queryHistoryRepository.save(any(QueryHistory.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
@@ -71,36 +74,46 @@ class HistoryServiceTest {
                         "test-user",
                         savedHistory.getRunUser()
                 ),
+
                 () -> assertEquals(
                         "1000",
                         savedHistory.getRunUid()
                 ),
+
                 () -> assertEquals(
-                        "1000",
+                        "1001",
                         savedHistory.getRunGid()
                 ),
+
                 () -> assertEquals(
                         "/input/generated",
                         savedHistory.getRequestedPath()
                 ),
+
                 () -> assertEquals(
                         "txt",
                         savedHistory.getExtension()
                 ),
+
                 () -> assertEquals(
                         5,
                         savedHistory.getResultCount()
                 ),
+
                 () -> assertEquals(
                         "SUCCESS",
                         savedHistory.getStatus()
                 ),
 
-                () -> assertNotNull(savedHistory.getRequestedAt()),
+                () -> assertNotNull(
+                        savedHistory.getRequestedAt()
+                ),
+
                 () -> assertFalse(
                         savedHistory.getRequestedAt()
                                 .isBefore(beforeSave)
                 ),
+
                 () -> assertFalse(
                         savedHistory.getRequestedAt()
                                 .isAfter(afterSave)
@@ -143,21 +156,138 @@ class HistoryServiceTest {
     }
 
     @Test
-    void getHistoryShouldReturnAllHistoryEntries() {
+    void getHistoryShouldConvertEntitiesToHistoryResponses() {
+        LocalDateTime firstRequestedAt =
+                LocalDateTime.of(2026, 7, 14, 10, 30);
+
+        LocalDateTime secondRequestedAt =
+                LocalDateTime.of(2026, 7, 14, 11, 45);
+
         QueryHistory firstHistory = mock(QueryHistory.class);
         QueryHistory secondHistory = mock(QueryHistory.class);
 
-        List<QueryHistory> expectedHistory = List.of(
-                firstHistory,
-                secondHistory
-        );
+        when(firstHistory.getId()).thenReturn(1L);
+        when(firstHistory.getRunUser()).thenReturn("first-user");
+        when(firstHistory.getRunUid()).thenReturn("1000");
+        when(firstHistory.getRunGid()).thenReturn("1001");
+        when(firstHistory.getRequestedPath()).thenReturn("/input/first");
+        when(firstHistory.getExtension()).thenReturn("txt");
+        when(firstHistory.getRequestedAt()).thenReturn(firstRequestedAt);
+        when(firstHistory.getResultCount()).thenReturn(3);
+        when(firstHistory.getStatus()).thenReturn("SUCCESS");
+
+        when(secondHistory.getId()).thenReturn(2L);
+        when(secondHistory.getRunUser()).thenReturn("second-user");
+        when(secondHistory.getRunUid()).thenReturn("2000");
+        when(secondHistory.getRunGid()).thenReturn("2001");
+        when(secondHistory.getRequestedPath()).thenReturn("/input/second");
+        when(secondHistory.getExtension()).thenReturn("json");
+        when(secondHistory.getRequestedAt()).thenReturn(secondRequestedAt);
+        when(secondHistory.getResultCount()).thenReturn(0);
+        when(secondHistory.getStatus()).thenReturn("FAILED");
 
         when(queryHistoryRepository.findAll())
-                .thenReturn(expectedHistory);
+                .thenReturn(List.of(firstHistory, secondHistory));
 
-        List<QueryHistory> result = historyService.getHistory();
+        List<HistoryResponse> result = historyService.getHistory();
 
-        assertSame(expectedHistory, result);
+        assertEquals(2, result.size());
+
+        HistoryResponse firstResponse = result.get(0);
+        HistoryResponse secondResponse = result.get(1);
+
+        assertAll(
+                () -> assertEquals(
+                        1L,
+                        firstResponse.id()
+                ),
+
+                () -> assertEquals(
+                        "first-user",
+                        firstResponse.runUser()
+                ),
+
+                () -> assertEquals(
+                        "1000",
+                        firstResponse.runUid()
+                ),
+
+                () -> assertEquals(
+                        "1001",
+                        firstResponse.runGid()
+                ),
+
+                () -> assertEquals(
+                        "/input/first",
+                        firstResponse.requestedPath()
+                ),
+
+                () -> assertEquals(
+                        "txt",
+                        firstResponse.extension()
+                ),
+
+                () -> assertEquals(
+                        firstRequestedAt,
+                        firstResponse.requestedAt()
+                ),
+
+                () -> assertEquals(
+                        3,
+                        firstResponse.resultCount()
+                ),
+
+                () -> assertEquals(
+                        "SUCCESS",
+                        firstResponse.status()
+                ),
+
+                () -> assertEquals(
+                        2L,
+                        secondResponse.id()
+                ),
+
+                () -> assertEquals(
+                        "second-user",
+                        secondResponse.runUser()
+                ),
+
+                () -> assertEquals(
+                        "2000",
+                        secondResponse.runUid()
+                ),
+
+                () -> assertEquals(
+                        "2001",
+                        secondResponse.runGid()
+                ),
+
+                () -> assertEquals(
+                        "/input/second",
+                        secondResponse.requestedPath()
+                ),
+
+                () -> assertEquals(
+                        "json",
+                        secondResponse.extension()
+                ),
+
+                () -> assertEquals(
+                        secondRequestedAt,
+                        secondResponse.requestedAt()
+                ),
+
+                () -> assertEquals(
+                        0,
+                        secondResponse.resultCount()
+                ),
+
+                () -> assertEquals(
+                        "FAILED",
+                        secondResponse.status()
+                )
+        );
+
         verify(queryHistoryRepository).findAll();
     }
 
@@ -166,7 +296,7 @@ class HistoryServiceTest {
         when(queryHistoryRepository.findAll())
                 .thenReturn(List.of());
 
-        List<QueryHistory> result = historyService.getHistory();
+        List<HistoryResponse> result = historyService.getHistory();
 
         assertNotNull(result);
         assertTrue(result.isEmpty());
@@ -175,13 +305,24 @@ class HistoryServiceTest {
     }
 
     @Test
-    void getHistoryShouldNotSaveOrModifyHistory() {
+    void getHistoryShouldNotInteractWithRunningUserProvider() {
+        when(queryHistoryRepository.findAll())
+                .thenReturn(List.of());
+
         historyService.getHistory();
 
         verify(queryHistoryRepository).findAll();
+        verifyNoInteractions(runningUserProvider);
+    }
+
+    @Test
+    void getHistoryShouldNotSaveAnything() {
+        when(queryHistoryRepository.findAll())
+                .thenReturn(List.of());
+
+        historyService.getHistory();
+
         verify(queryHistoryRepository, never())
                 .save(any(QueryHistory.class));
-
-        verifyNoInteractions(runningUserProvider);
     }
 }
