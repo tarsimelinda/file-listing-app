@@ -1,5 +1,6 @@
 package com.codecool.backend.service;
 
+import com.codecool.backend.dto.HistoryResponse;
 import com.codecool.backend.entity.QueryHistory;
 import com.codecool.backend.repository.QueryHistoryRepository;
 import org.springframework.stereotype.Service;
@@ -41,7 +42,20 @@ public class HistoryService {
         return queryHistoryRepository.save(history);
     }
 
-    public List<QueryHistory> getHistory() {
-        return queryHistoryRepository.findAll();
+    public List<HistoryResponse> getHistory() {
+        return queryHistoryRepository.findAll()
+                .stream()
+                .map(history -> new HistoryResponse(
+                        history.getId(),
+                        history.getRunUser(),
+                        history.getRunUid(),
+                        history.getRunGid(),
+                        history.getRequestedPath(),
+                        history.getExtension(),
+                        history.getRequestedAt(),
+                        history.getResultCount(),
+                        history.getStatus()
+                ))
+                .toList();
     }
 }
