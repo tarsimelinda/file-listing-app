@@ -1,11 +1,10 @@
 NETWORK=file-listing-net
 
 DB_CONTAINER=file-listing-db
-BACKEND_CONTAINER=file-listing-backend
-FRONTEND_CONTAINER=file-listing-frontend
+BACKEND_CONTAINER_1=file-listing-backend-1
+BACKEND_CONTAINER_2=file-listing-backend-2
 
 BACKEND_IMAGE=file-listing-backend
-FRONTEND_IMAGE=file-listing-frontend
 
 DB_NAME=filedb
 DB_USER=fileuser
@@ -16,13 +15,14 @@ RUN_USER := $(shell whoami 2>/dev/null || echo unknown)
 RUN_UID := $(shell id -u 2>/dev/null || echo unknown)
 RUN_GID := $(shell id -g 2>/dev/null || echo unknown)
 
-.PHONY: run network db wait-db build-backend backend build-frontend frontend stop clean ps logs
+.PHONY: run network db wait-db build-backend backend-1 backend-2 stop clean ps logs
 
-run: network db wait-db build-backend backend build-frontend frontend
+run: network db wait-db build-backend backend-1 backend-2
 	@echo "Application is running:"
-	@echo "Frontend: http://localhost:3000"
-	@echo "Backend:  http://localhost:8080"
-	@echo "Swagger:  http://localhost:8080/swagger-ui.html"
+	@echo "Backend instance 1: http://localhost:8080"
+	@echo "Backend instance 2: http://localhost:8081"
+	@echo "Swagger instance 1: http://localhost:8080/swagger-ui.html"
+	@echo "Swagger instance 2: http://localhost:8081/swagger-ui.html"
 
 network:
 	@podman network exists $(NETWORK) || podman network create $(NETWORK)
@@ -52,9 +52,9 @@ wait-db:
 build-backend:
 	podman build -t $(BACKEND_IMAGE) ./backend
 
-backend:
+backend-1:
 	podman run -d --replace \
-		--name $(BACKEND_CONTAINER) \
+		--name $(BACKEND_CONTAINER_1) \
 		--network $(NETWORK) \
 		-p 8080:8080 \
 		-v "$(PROJECT_DIR)/input:/input" \
@@ -66,32 +66,36 @@ backend:
 		-e SPRING_DATASOURCE_PASSWORD=$(DB_PASSWORD) \
 		$(BACKEND_IMAGE)
 
-build-frontend:
-	podman build -t $(FRONTEND_IMAGE) ./frontend
-
-frontend:
+backend-2:
 	podman run -d --replace \
-		--name $(FRONTEND_CONTAINER) \
+		--name $(BACKEND_CONTAINER_2) \
 		--network $(NETWORK) \
-		-p 3000:80 \
-		$(FRONTEND_IMAGE)
+		-p 8081:8080 \
+		-v "$(PROJECT_DIR)/input:/input" \
+		-e APP_RUN_USER="$(RUN_USER)" \
+		-e APP_RUN_UID="$(RUN_UID)" \
+		-e APP_RUN_GID="$(RUN_GID)" \
+		-e SPRING_DATASOURCE_URL=jdbc:postgresql://$(DB_CONTAINER):5432/$(DB_NAME) \
+		-e SPRING_DATASOURCE_USERNAME=$(DB_USER) \
+		-e SPRING_DATASOURCE_PASSWORD=$(DB_PASSWORD) \
+		$(BACKEND_IMAGE)
 
 stop:
-	-podman stop $(FRONTEND_CONTAINER) $(BACKEND_CONTAINER) $(DB_CONTAINER)
-	-podman rm $(FRONTEND_CONTAINER) $(BACKEND_CONTAINER) $(DB_CONTAINER)
+	-podman stop $(BACKEND_CONTAINER_1) $(BACKEND_CONTAINER_2) $(DB_CONTAINER)
+	-podman rm $(BACKEND_CONTAINER_1) $(BACKEND_CONTAINER_2) $(DB_CONTAINER)
 
 clean: stop
-	-podman rmi $(FRONTEND_IMAGE) $(BACKEND_IMAGE)
+	-podman rmi $(BACKEND_IMAGE)
 
 ps:
 	podman ps
 
 logs:
-	@echo "Backend logs:"
-	@podman logs $(BACKEND_CONTAINER)
+	@echo "Backend instance 1 logs:"
+	@podman logs $(BACKEND_CONTAINER_1)
 	@echo ""
-	@echo "Frontend logs:"
-	@podman logs $(FRONTEND_CONTAINER)
+	@echo "Backend instance 2 logs:"
+	@podman logs $(BACKEND_CONTAINER_2)
 	@echo ""
 	@echo "Database logs:"
 	@podman logs $(DB_CONTAINER)
