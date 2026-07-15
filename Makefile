@@ -11,9 +11,6 @@ DB_USER=fileuser
 DB_PASSWORD=filepass
 
 PROJECT_DIR := $(shell pwd -W 2>/dev/null || pwd)
-RUN_USER := $(shell whoami 2>/dev/null || echo unknown)
-RUN_UID := $(shell id -u 2>/dev/null || echo unknown)
-RUN_GID := $(shell id -g 2>/dev/null || echo unknown)
 
 .PHONY: run network db wait-db build-backend backend-1 backend-2 stop clean ps logs
 
@@ -56,11 +53,9 @@ backend-1:
 	podman run -d --replace \
 		--name $(BACKEND_CONTAINER_1) \
 		--network $(NETWORK) \
+		--user appuser1 \
 		-p 8080:8080 \
 		-v "$(PROJECT_DIR)/input:/input" \
-		-e APP_RUN_USER="$(RUN_USER)" \
-		-e APP_RUN_UID="$(RUN_UID)" \
-		-e APP_RUN_GID="$(RUN_GID)" \
 		-e SPRING_DATASOURCE_URL=jdbc:postgresql://$(DB_CONTAINER):5432/$(DB_NAME) \
 		-e SPRING_DATASOURCE_USERNAME=$(DB_USER) \
 		-e SPRING_DATASOURCE_PASSWORD=$(DB_PASSWORD) \
@@ -70,11 +65,9 @@ backend-2:
 	podman run -d --replace \
 		--name $(BACKEND_CONTAINER_2) \
 		--network $(NETWORK) \
+		--user appuser2 \
 		-p 8081:8080 \
 		-v "$(PROJECT_DIR)/input:/input" \
-		-e APP_RUN_USER="$(RUN_USER)" \
-		-e APP_RUN_UID="$(RUN_UID)" \
-		-e APP_RUN_GID="$(RUN_GID)" \
 		-e SPRING_DATASOURCE_URL=jdbc:postgresql://$(DB_CONTAINER):5432/$(DB_NAME) \
 		-e SPRING_DATASOURCE_USERNAME=$(DB_USER) \
 		-e SPRING_DATASOURCE_PASSWORD=$(DB_PASSWORD) \

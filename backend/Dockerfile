@@ -18,8 +18,14 @@ FROM eclipse-temurin:21-jre
 
 WORKDIR /app
 
-RUN useradd -m appuser
-USER appuser
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends htop procps \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN groupadd -g 1001 appuser1 \
+    && useradd -m -u 1001 -g 1001 appuser1 \
+    && groupadd -g 1002 appuser2 \
+    && useradd -m -u 1002 -g 1002 appuser2
 
 COPY --from=build /app/build/libs/*.jar app.jar
 
