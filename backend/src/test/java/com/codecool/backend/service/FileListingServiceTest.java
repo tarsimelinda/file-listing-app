@@ -17,18 +17,18 @@ class FileListingServiceTest {
     Path tempDirectory;
 
     private Path inputRoot;
-    private FileListingService service;
+    private FileListingService fileListingService;
 
     @BeforeEach
     void setUp() throws IOException {
         inputRoot = tempDirectory.resolve("input");
         Files.createDirectories(inputRoot);
 
-        service = new FileListingService(inputRoot.toString());
+        fileListingService = new FileListingService(inputRoot.toString());
     }
 
     @Test
-    void listFilesShouldReturnAllMatchingFilesRecursively() throws IOException {
+    void listFilesShouldReturnMatchingFileNamesRecursively() throws IOException {
         Path firstDirectory = inputRoot.resolve("a");
         Path secondDirectory = firstDirectory.resolve("b");
 
@@ -39,28 +39,84 @@ class FileListingServiceTest {
         Files.writeString(secondDirectory.resolve("second.txt"), "content");
         Files.writeString(secondDirectory.resolve("ignored.json"), "content");
 
-        List<String> result = service.listFiles(
+        List<String> result = fileListingService.listFiles(
                 inputRoot.toString(),
                 "txt"
         );
 
         assertEquals(
                 List.of(
-                        "a/b/second.txt",
-                        "a/first.txt",
-                        "root.txt"
+                        "first.txt",
+                        "root.txt",
+                        "second.txt"
                 ),
                 result
         );
     }
 
     @Test
-    void listFilesShouldReturnAllFilesWhenExtensionIsNull() throws IOException {
+    void listFilesShouldReturnOnlyUniqueFileNames() throws IOException {
+        Path firstDirectory = inputRoot.resolve("first");
+        Path secondDirectory = inputRoot.resolve("second");
+
+        Files.createDirectories(firstDirectory);
+        Files.createDirectories(secondDirectory);
+
+        Files.writeString(
+                firstDirectory.resolve("duplicate.txt"),
+                "first content"
+        );
+
+        Files.writeString(
+                secondDirectory.resolve("duplicate.txt"),
+                "second content"
+        );
+
+        List<String> result = fileListingService.listFiles(
+                inputRoot.toString(),
+                "txt"
+        );
+
+        assertEquals(
+                List.of("duplicate.txt"),
+                result
+        );
+    }
+
+    @Test
+    void listFilesShouldReturnOnlyFileNamesWithoutDirectoryPaths()
+            throws IOException {
+
+        Path nestedDirectory = inputRoot
+                .resolve("first")
+                .resolve("second");
+
+        Files.createDirectories(nestedDirectory);
+        Files.writeString(
+                nestedDirectory.resolve("file.txt"),
+                "content"
+        );
+
+        List<String> result = fileListingService.listFiles(
+                inputRoot.toString(),
+                "txt"
+        );
+
+        assertEquals(
+                List.of("file.txt"),
+                result
+        );
+    }
+
+    @Test
+    void listFilesShouldReturnAllFilesWhenExtensionIsNull()
+            throws IOException {
+
         Files.writeString(inputRoot.resolve("first.txt"), "content");
         Files.writeString(inputRoot.resolve("second.json"), "content");
         Files.writeString(inputRoot.resolve("third.csv"), "content");
 
-        List<String> result = service.listFiles(
+        List<String> result = fileListingService.listFiles(
                 inputRoot.toString(),
                 null
         );
@@ -76,11 +132,13 @@ class FileListingServiceTest {
     }
 
     @Test
-    void listFilesShouldReturnAllFilesWhenExtensionIsBlank() throws IOException {
+    void listFilesShouldReturnAllFilesWhenExtensionIsBlank()
+            throws IOException {
+
         Files.writeString(inputRoot.resolve("first.txt"), "content");
         Files.writeString(inputRoot.resolve("second.json"), "content");
 
-        List<String> result = service.listFiles(
+        List<String> result = fileListingService.listFiles(
                 inputRoot.toString(),
                 " "
         );
@@ -95,11 +153,13 @@ class FileListingServiceTest {
     }
 
     @Test
-    void listFilesShouldRemoveLeadingDotFromExtension() throws IOException {
+    void listFilesShouldRemoveLeadingDotFromExtension()
+            throws IOException {
+
         Files.writeString(inputRoot.resolve("first.txt"), "content");
         Files.writeString(inputRoot.resolve("second.json"), "content");
 
-        List<String> result = service.listFiles(
+        List<String> result = fileListingService.listFiles(
                 inputRoot.toString(),
                 ".txt"
         );
@@ -115,7 +175,7 @@ class FileListingServiceTest {
         Files.writeString(inputRoot.resolve("first.txt"), "content");
         Files.writeString(inputRoot.resolve("second.json"), "content");
 
-        List<String> result = service.listFiles(
+        List<String> result = fileListingService.listFiles(
                 inputRoot.toString(),
                 "  txt  "
         );
@@ -127,35 +187,12 @@ class FileListingServiceTest {
     }
 
     @Test
-    void listFilesShouldReturnRelativePaths() throws IOException {
-        Path nestedDirectory = inputRoot
-                .resolve("first")
-                .resolve("second");
-
-        Files.createDirectories(nestedDirectory);
-        Files.writeString(
-                nestedDirectory.resolve("file.txt"),
-                "content"
-        );
-
-        List<String> result = service.listFiles(
-                inputRoot.toString(),
-                "txt"
-        );
-
-        assertEquals(
-                List.of("first/second/file.txt"),
-                result
-        );
-    }
-
-    @Test
-    void listFilesShouldReturnSortedPaths() throws IOException {
+    void listFilesShouldReturnSortedFileNames() throws IOException {
         Files.writeString(inputRoot.resolve("z.txt"), "content");
         Files.writeString(inputRoot.resolve("a.txt"), "content");
         Files.writeString(inputRoot.resolve("m.txt"), "content");
 
-        List<String> result = service.listFiles(
+        List<String> result = fileListingService.listFiles(
                 inputRoot.toString(),
                 "txt"
         );
@@ -171,11 +208,13 @@ class FileListingServiceTest {
     }
 
     @Test
-    void listFilesShouldReturnEmptyListWhenNoFilesMatch() throws IOException {
+    void listFilesShouldReturnEmptyListWhenNoFilesMatch()
+            throws IOException {
+
         Files.writeString(inputRoot.resolve("first.json"), "content");
         Files.writeString(inputRoot.resolve("second.csv"), "content");
 
-        List<String> result = service.listFiles(
+        List<String> result = fileListingService.listFiles(
                 inputRoot.toString(),
                 "txt"
         );
@@ -185,11 +224,12 @@ class FileListingServiceTest {
 
     @Test
     void listFilesShouldReturnEmptyListForEmptyDirectory() {
-        List<String> result = service.listFiles(
+        List<String> result = fileListingService.listFiles(
                 inputRoot.toString(),
                 "txt"
         );
 
+        assertNotNull(result);
         assertTrue(result.isEmpty());
     }
 
@@ -198,7 +238,7 @@ class FileListingServiceTest {
         Files.createDirectories(inputRoot.resolve("directory.txt"));
         Files.writeString(inputRoot.resolve("file.txt"), "content");
 
-        List<String> result = service.listFiles(
+        List<String> result = fileListingService.listFiles(
                 inputRoot.toString(),
                 "txt"
         );
@@ -210,7 +250,7 @@ class FileListingServiceTest {
     }
 
     @Test
-    void listFilesShouldUseRequestedSubdirectoryAsRelativePathRoot()
+    void listFilesShouldSearchOnlyUnderRequestedSubdirectory()
             throws IOException {
 
         Path requestedDirectory = inputRoot.resolve("requested");
@@ -222,16 +262,18 @@ class FileListingServiceTest {
                 requestedDirectory.resolve("first.txt"),
                 "content"
         );
+
         Files.writeString(
                 nestedDirectory.resolve("second.txt"),
                 "content"
         );
+
         Files.writeString(
-                inputRoot.resolve("outside-requested-directory.txt"),
+                inputRoot.resolve("outside.txt"),
                 "content"
         );
 
-        List<String> result = service.listFiles(
+        List<String> result = fileListingService.listFiles(
                 requestedDirectory.toString(),
                 "txt"
         );
@@ -239,7 +281,7 @@ class FileListingServiceTest {
         assertEquals(
                 List.of(
                         "first.txt",
-                        "nested/second.txt"
+                        "second.txt"
                 ),
                 result
         );
@@ -249,7 +291,7 @@ class FileListingServiceTest {
     void listFilesShouldRejectNullPath() {
         IllegalArgumentException exception = assertThrows(
                 IllegalArgumentException.class,
-                () -> service.listFiles(null, "txt")
+                () -> fileListingService.listFiles(null, "txt")
         );
 
         assertEquals(
@@ -262,7 +304,7 @@ class FileListingServiceTest {
     void listFilesShouldRejectBlankPath() {
         IllegalArgumentException exception = assertThrows(
                 IllegalArgumentException.class,
-                () -> service.listFiles(" ", "txt")
+                () -> fileListingService.listFiles(" ", "txt")
         );
 
         assertEquals(
@@ -277,7 +319,7 @@ class FileListingServiceTest {
 
         IllegalArgumentException exception = assertThrows(
                 IllegalArgumentException.class,
-                () -> service.listFiles(
+                () -> fileListingService.listFiles(
                         missingPath.toString(),
                         "txt"
                 )
@@ -298,7 +340,7 @@ class FileListingServiceTest {
 
         IllegalArgumentException exception = assertThrows(
                 IllegalArgumentException.class,
-                () -> service.listFiles(
+                () -> fileListingService.listFiles(
                         filePath.toString(),
                         "txt"
                 )
@@ -319,7 +361,7 @@ class FileListingServiceTest {
 
         IllegalArgumentException exception = assertThrows(
                 IllegalArgumentException.class,
-                () -> service.listFiles(
+                () -> fileListingService.listFiles(
                         outsideDirectory.toString(),
                         "txt"
                 )
@@ -335,7 +377,7 @@ class FileListingServiceTest {
     void listFilesShouldRejectExtensionContainingForwardSlash() {
         IllegalArgumentException exception = assertThrows(
                 IllegalArgumentException.class,
-                () -> service.listFiles(
+                () -> fileListingService.listFiles(
                         inputRoot.toString(),
                         "folder/txt"
                 )
@@ -351,7 +393,7 @@ class FileListingServiceTest {
     void listFilesShouldRejectExtensionContainingBackslash() {
         IllegalArgumentException exception = assertThrows(
                 IllegalArgumentException.class,
-                () -> service.listFiles(
+                () -> fileListingService.listFiles(
                         inputRoot.toString(),
                         "folder\\txt"
                 )
@@ -367,10 +409,17 @@ class FileListingServiceTest {
     void listFilesShouldMatchExtensionCaseSensitively()
             throws IOException {
 
-        Files.writeString(inputRoot.resolve("lowercase.txt"), "content");
-        Files.writeString(inputRoot.resolve("uppercase.TXT"), "content");
+        Files.writeString(
+                inputRoot.resolve("lowercase.txt"),
+                "content"
+        );
 
-        List<String> result = service.listFiles(
+        Files.writeString(
+                inputRoot.resolve("uppercase.TXT"),
+                "content"
+        );
+
+        List<String> result = fileListingService.listFiles(
                 inputRoot.toString(),
                 "txt"
         );
@@ -387,9 +436,9 @@ class FileListingServiceTest {
 
         Files.writeString(inputRoot.resolve("correct.txt"), "content");
         Files.writeString(inputRoot.resolve("incorrecttxt"), "content");
-        Files.writeString(inputRoot.resolve("also-incorrect.atxt"), "content");
+        Files.writeString(inputRoot.resolve("incorrect.atxt"), "content");
 
-        List<String> result = service.listFiles(
+        List<String> result = fileListingService.listFiles(
                 inputRoot.toString(),
                 "txt"
         );

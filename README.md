@@ -5,7 +5,7 @@ A containerized full-stack application for generating and listing files from a m
 The application can:
 
 * generate a deep folder structure under an input directory
-* recursively list files by extension
+* recursively list unique file names by extension
 * store query history in PostgreSQL
 * expose REST endpoints with OpenAPI/Swagger documentation
 * run the full stack with one Makefile command
@@ -33,6 +33,7 @@ The application can:
 * Podman
 * PostgreSQL 16 container
 * Makefile-based container orchestration
+* No Docker Compose
 
 ## Project structure
 
@@ -65,6 +66,8 @@ make
 
 On Windows, the application can be started from WSL or another terminal where `make` is available.
 
+The Podman machine must be running before starting the application.
+
 ## Start the application
 
 From the project root:
@@ -80,6 +83,8 @@ This command:
 3. builds and starts the backend container
 4. builds and starts the frontend container
 5. mounts the local `input` directory into the backend container as `/input`
+
+No separate database setup, Gradle build, `npm install`, or Docker Compose command is required.
 
 ## Stop the application
 
@@ -127,6 +132,12 @@ Swagger UI:
 http://localhost:8080/swagger-ui.html
 ```
 
+Raw OpenAPI documentation:
+
+```text
+http://localhost:8080/v3/api-docs
+```
+
 PostgreSQL is exposed on host port:
 
 ```text
@@ -163,6 +174,8 @@ Example:
 
 Generated folders and files are created inside the mounted input directory, so they are visible both inside the container and on the host machine.
 
+The backend restricts file operations to the configured input root. This prevents requests from accessing paths outside the mounted input directory.
+
 ## REST endpoints
 
 ### Generate deep file structure
@@ -182,7 +195,13 @@ Example request:
 }
 ```
 
-This creates a deep directory structure under `/input/generated`.
+This creates a deep directory structure under:
+
+```text
+/input/generated
+```
+
+Before generating a new structure, the existing `generated` directory under the selected base path is removed and recreated. This keeps the generated output clean and predictable.
 
 Directory names are generated alphabetically:
 
@@ -221,16 +240,43 @@ Example response:
   "requestedPath": "/input",
   "extension": "txt",
   "files": [
+    "1.txt",
+    "2.txt",
     "a.txt",
-    "nested1/c.txt",
-    "generated/a/1.txt",
-    "generated/a/b/2.txt"
+    "c.txt"
   ],
   "count": 4
 }
 ```
 
-The file listing is recursive and searches through all subdirectories.
+The file listing is recursive and searches through all subdirectories under the requested path.
+
+The response contains unique file names. If the same file name appears in multiple directories, it is returned only once because the backend stores the result in a `HashSet`.
+
+For example, if the input directory contains:
+
+```text
+/input/a.txt
+/input/nested/a.txt
+/input/nested/c.txt
+```
+
+the response will contain:
+
+```text
+a.txt
+c.txt
+```
+
+The `count` field represents the number of unique file names returned.
+
+If the `extension` parameter is empty or omitted, the endpoint lists all regular files regardless of extension.
+
+Example:
+
+```http
+GET /api/list?path=/input
+```
 
 ### Get query history
 
@@ -267,9 +313,9 @@ The history stores:
 
 The status can be:
 
-- `SUCCESS` for successful file listing requests
-- `GENERATED` for successful file generation requests
-- `FAILED` for failed generation or listing requests
+* `SUCCESS` for successful file listing requests
+* `GENERATED` for successful file generation requests
+* `FAILED` for failed generation or listing requests
 
 ## Database
 
@@ -284,6 +330,49 @@ password: filepass
 ```
 
 The application tables are created and updated automatically by Hibernate based on the JPA entities.
+
+No persistent database volume is used. The stored history is intended for local demo and runtime usage, and it can be reset when the database container is removed.
+
+## OpenAPI
+
+Swagger UI is available at:
+
+```text
+http://localhost:8080/swagger-ui.html
+```
+
+The raw OpenAPI documentation is available at:
+
+```text
+http://localhost:8080/v3/api-docs
+```
+
+The OpenAPI documentation is generated automatically from the Spring Boot REST controllers by Springdoc OpenAPI.
+
+## Error handling
+
+Invalid requests return a structured JSON error response.
+
+Example:
+
+```json
+{
+  "message": "Path does not exist or cannot be accessed: /wrong",
+  "status": 400,
+  "error": "Bad Request",
+  "timestamp": "2026-07-13T10:30:00"
+}
+```
+
+Failed list and generate requests are also stored in the query history with `FAILED` status.
+
+## Notes about generated files
+
+The `POST /api/generate` endpoint writes into the mounted `/input` directory. Because of this, the backend container must mount the input directory with write permission.
+
+The Makefile handles this automatically.
+
+Generated files are runtime output. They do not need to be committed to the repository.
 
 ## Development notes
 
@@ -314,25 +403,11 @@ The production frontend container runs on:
 http://localhost:3000
 ```
 
-## OpenAPI
-
-Swagger UI is available at:
+The frontend API URL can be configured with:
 
 ```text
-http://localhost:8080/swagger-ui.html
+VITE_API_BASE_URL=http://localhost:8080
 ```
-
-The raw OpenAPI documentation is available at:
-
-```text
-http://localhost:8080/v3/api-docs
-```
-
-## Notes about generated files
-
-The `POST /api/generate` endpoint writes into the mounted `/input` directory. Because of this, the backend container must mount the input directory with write permission.
-
-The Makefile handles this automatically.
 
 ## One-command startup
 
@@ -348,20 +423,4 @@ This starts all required containers and makes the application available at:
 http://localhost:3000
 ```
 
-## Error handling
-
-Invalid requests return a structured JSON error response.
-
-Example:
-
-```json
-{
-  "message": "Path does not exist: /wrong",
-  "status": 400,
-  "error": "Bad Request",
-  "timestamp": "2026-07-13T10:30:00"
-}
-```
-
-Failed list and generate requests are also stored in the query history with FAILED status.
-
+The “one click” requirement is implemented as a one-command startup using the Makefile.

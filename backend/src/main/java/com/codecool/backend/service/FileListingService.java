@@ -21,26 +21,23 @@ public class FileListingService {
     }
 
     /**
-     * Recursively lists files under the requested directory and filters them by extension.
+     * Recursively lists unique file names under the requested directory
+     * and filters them by extension.
      *
      * @param requestedPath the directory path to search under
      * @param extension optional file extension filter without or with leading dot
-     * @return sorted relative file paths matching the requested extension
+     * @return sorted unique file names matching the requested extension
      */
     public List<String> listFiles(String requestedPath, String extension) {
         validateRequest(requestedPath);
 
         Path startPath = resolveAndValidatePath(requestedPath);
-
         String normalizedExtension = normalizeExtension(extension);
 
-        Set<Path> files = new HashSet<>();
+        Set<String> files = new HashSet<>();
         collectFiles(startPath, files, normalizedExtension);
 
         return files.stream()
-                .map(startPath::relativize)
-                .map(Path::toString)
-                .map(path -> path.replace("\\", "/"))
                 .sorted()
                 .toList();
     }
@@ -70,13 +67,13 @@ public class FileListingService {
         }
     }
 
-    private void collectFiles(Path currentPath, Set<Path> files, String extension) {
+    private void collectFiles(Path currentPath, Set<String> files, String extension) {
         try (DirectoryStream<Path> entries = Files.newDirectoryStream(currentPath)) {
             for (Path entry : entries) {
                 if (Files.isDirectory(entry)) {
                     collectFiles(entry, files, extension);
                 } else if (Files.isRegularFile(entry) && matchesExtension(entry, extension)) {
-                    files.add(entry);
+                    files.add(entry.getFileName().toString());
                 }
             }
         } catch (IOException e) {
