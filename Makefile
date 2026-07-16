@@ -3,19 +3,22 @@ NETWORK=file-listing-net
 DB_CONTAINER=file-listing-db
 BACKEND_CONTAINER_1=file-listing-backend-1
 BACKEND_CONTAINER_2=file-listing-backend-2
+FRONTEND_CONTAINER=file-listing-frontend
 
 BACKEND_IMAGE=file-listing-backend
+FRONTEND_IMAGE=file-listing-frontend
 
 DB_NAME=filedb
 DB_USER=fileuser
 DB_PASSWORD=filepass
 
-PROJECT_DIR := $(shell pwd -W 2>/dev/null || pwd)
+PROJECT_DIR := $(shell pwd)
 
-.PHONY: run network db wait-db build-backend backend-1 backend-2 stop clean ps logs
+.PHONY: run network db wait-db build-backend backend-1 backend-2 build-frontend frontend stop clean ps logs
 
-run: network db wait-db build-backend backend-1 backend-2
+run: network db wait-db build-backend backend-1 backend-2 build-frontend frontend
 	@echo "Application is running:"
+	@echo "Frontend: http://localhost:3000"
 	@echo "Backend instance 1: http://localhost:8080"
 	@echo "Backend instance 2: http://localhost:8081"
 	@echo "Swagger instance 1: http://localhost:8080/swagger-ui.html"
@@ -49,6 +52,16 @@ wait-db:
 build-backend:
 	podman build -t $(BACKEND_IMAGE) ./backend
 
+build-frontend:
+	podman build -t $(FRONTEND_IMAGE) ./frontend
+
+frontend:
+	podman run -d --replace \
+		--name $(FRONTEND_CONTAINER) \
+		--network $(NETWORK) \
+		-p 3000:80 \
+		$(FRONTEND_IMAGE)
+
 backend-1:
 	podman run -d --replace \
 		--name $(BACKEND_CONTAINER_1) \
@@ -74,11 +87,11 @@ backend-2:
 		$(BACKEND_IMAGE)
 
 stop:
-	-podman stop $(BACKEND_CONTAINER_1) $(BACKEND_CONTAINER_2) $(DB_CONTAINER)
-	-podman rm $(BACKEND_CONTAINER_1) $(BACKEND_CONTAINER_2) $(DB_CONTAINER)
+	-podman stop $(FRONTEND_CONTAINER) $(BACKEND_CONTAINER_1) $(BACKEND_CONTAINER_2) $(DB_CONTAINER)
+	-podman rm $(FRONTEND_CONTAINER) $(BACKEND_CONTAINER_1) $(BACKEND_CONTAINER_2) $(DB_CONTAINER)
 
 clean: stop
-	-podman rmi $(BACKEND_IMAGE)
+	-podman rmi $(FRONTEND_IMAGE) $(BACKEND_IMAGE)
 
 ps:
 	podman ps
@@ -89,6 +102,9 @@ logs:
 	@echo ""
 	@echo "Backend instance 2 logs:"
 	@podman logs $(BACKEND_CONTAINER_2)
+	@echo ""
+	@echo "Frontend logs:"
+	@podman logs $(FRONTEND_CONTAINER)
 	@echo ""
 	@echo "Database logs:"
 	@podman logs $(DB_CONTAINER)
