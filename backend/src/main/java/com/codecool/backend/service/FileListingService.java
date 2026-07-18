@@ -4,12 +4,11 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
-import java.nio.file.DirectoryStream;
+import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
+import java.util.stream.Stream;
 
 @Service
 public class FileListingService {
@@ -29,20 +28,27 @@ public class FileListingService {
      * @return sorted unique file names matching the requested extension
      */
     public List<String> listFiles(String requestedPath, String extension) {
-        validateRequest(requestedPath);
-
-        Path startPath = resolveAndValidatePath(requestedPath);
+        Path startPath = resolvePath(requestedPath);
         String normalizedExtension = normalizeExtension(extension);
 
-        Set<String> files = new HashSet<>();
-        collectFiles(startPath, files, normalizedExtension);
-
-        return files.stream()
-                .sorted()
-                .toList();
+        try (Stream<Path> paths = Files.walk(startPath)) {
+            return paths
+                    .filter(Files::isRegularFile)
+                    .filter(path -> matchesExtension(path, normalizedExtension))
+                    .map(path -> path.getFileName().toString())
+                    .distinct()
+                    .sorted()
+                    .toList();
+        } catch (IOException | UncheckedIOException e) {
+            throw new IllegalStateException("Failed to list files under: " + requestedPath, e);
+        }
     }
 
-    private Path resolveAndValidatePath(String requestedPath) {
+    private Path resolvePath(String requestedPath) {
+        if (requestedPath == null || requestedPath.isBlank()) {
+            throw new IllegalArgumentException("Path must not be empty.");
+        }
+
         try {
             Path realInputRoot = inputRoot.toRealPath().normalize();
             Path resolvedPath = Path.of(requestedPath).toRealPath().normalize();
@@ -52,7 +58,7 @@ public class FileListingService {
             }
 
             if (!Files.isDirectory(resolvedPath)) {
-                throw new IllegalArgumentException("Path is not a directory: " + requestedPath);
+                throw new IllegalArgumentException("Path must be an existing directory: " + requestedPath);
             }
 
             return resolvedPath;
@@ -61,42 +67,15 @@ public class FileListingService {
         }
     }
 
-    private void validateRequest(String requestedPath) {
-        if (requestedPath == null || requestedPath.isBlank()) {
-            throw new IllegalArgumentException("Path must not be empty.");
-        }
-    }
-
-    private void collectFiles(Path currentPath, Set<String> files, String extension) {
-        try (DirectoryStream<Path> entries = Files.newDirectoryStream(currentPath)) {
-            for (Path entry : entries) {
-                if (Files.isDirectory(entry)) {
-                    collectFiles(entry, files, extension);
-                } else if (Files.isRegularFile(entry) && matchesExtension(entry, extension)) {
-                    files.add(entry.getFileName().toString());
-                }
-            }
-        } catch (IOException e) {
-            throw new IllegalStateException("Failed to read directory: " + currentPath, e);
-        }
-    }
-
     private boolean matchesExtension(Path path, String extension) {
-        if (extension == null || extension.isBlank()) {
-            return true;
-        }
-
-        String fileName = path.getFileName().toString();
-
-        return fileName.endsWith("." + extension);
+        return extension.isBlank()
+                || path.getFileName().toString().endsWith("." + extension);
     }
 
     private String normalizeExtension(String extension) {
-        if (extension == null) {
-            return "";
-        }
-
-        String normalizedExtension = extension.trim().replaceFirst("^\\.", "");
+        String normalizedExtension = extension == null
+                ? ""
+                : extension.trim().replaceFirst("^\\.", "");
 
         if (normalizedExtension.contains("/") || normalizedExtension.contains("\\")) {
             throw new IllegalArgumentException("Extension must not contain path separators.");

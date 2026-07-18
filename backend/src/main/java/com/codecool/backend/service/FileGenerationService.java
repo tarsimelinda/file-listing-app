@@ -33,41 +33,30 @@ public class FileGenerationService {
     public GenerateResponse generate(GenerateRequest request) {
         validateRequest(request);
 
+        Path basePath = resolveBasePath(request.basePath());
+        Path generatedRoot = basePath.resolve("generated");
+        Path currentPath = generatedRoot;
         String extension = normalizeExtension(request.extension());
-
-        Path basePath = resolveAndValidateBasePath(request.basePath());
-        Path generatedRoot = basePath.resolve("generated").normalize();
-
-        int createdDirectories = 0;
-        int createdFiles = 0;
 
         try {
             deleteDirectoryIfExists(generatedRoot);
             Files.createDirectories(generatedRoot);
 
-            Path currentPath = generatedRoot;
-
             for (int level = 1; level <= request.depth(); level++) {
-                String directoryName = toAlphabeticName(level);
-
-                currentPath = currentPath.resolve(directoryName).normalize();
+                currentPath = currentPath.resolve(toAlphabeticName(level));
                 Files.createDirectories(currentPath);
-                createdDirectories++;
 
                 for (int fileNumber = 1; fileNumber <= request.filesPerDirectory(); fileNumber++) {
                     String fileName = fileNumber + "." + extension;
-                    Path filePath = currentPath.resolve(fileName).normalize();
-
-                    Files.writeString(filePath, "Generated file: " + fileName);
-                    createdFiles++;
+                    Files.writeString(currentPath.resolve(fileName), "Generated file: " + fileName);
                 }
             }
 
             return new GenerateResponse(
                     request.basePath(),
                     request.depth(),
-                    createdDirectories,
-                    createdFiles,
+                    request.depth(),
+                    request.depth() * request.filesPerDirectory(),
                     generatedRoot.relativize(currentPath).toString().replace("\\", "/")
             );
         } catch (IOException e) {
@@ -81,14 +70,9 @@ public class FileGenerationService {
         }
 
         try (Stream<Path> paths = Files.walk(directory)) {
-            paths.sorted(Comparator.reverseOrder())
-                    .forEach(path -> {
-                        try {
-                            Files.delete(path);
-                        } catch (IOException e) {
-                            throw new IllegalStateException("Failed to delete path: " + path, e);
-                        }
-                    });
+            for (Path path : paths.sorted(Comparator.reverseOrder()).toList()) {
+                Files.delete(path);
+            }
         }
     }
 
@@ -97,39 +81,32 @@ public class FileGenerationService {
             throw new IllegalArgumentException("Base path must not be empty.");
         }
 
-        if (request.depth() <= 0) {
-            throw new IllegalArgumentException("Depth must be greater than zero.");
+        if (request.depth() <= 0 || request.depth() > MAX_DEPTH) {
+            throw new IllegalArgumentException("Depth must be between 1 and " + MAX_DEPTH + ".");
         }
 
-        if (request.filesPerDirectory() < 0) {
-            throw new IllegalArgumentException("Files per directory cannot be negative.");
-        }
-
-        if (request.depth() > MAX_DEPTH) {
-            throw new IllegalArgumentException("Depth must not be greater than " + MAX_DEPTH + ".");
-        }
-
-        if (request.filesPerDirectory() > MAX_FILES_PER_DIRECTORY) {
-            throw new IllegalArgumentException("Files per directory must not be greater than " + MAX_FILES_PER_DIRECTORY + ".");
+        if (request.filesPerDirectory() < 0 || request.filesPerDirectory() > MAX_FILES_PER_DIRECTORY) {
+            throw new IllegalArgumentException("Files per directory must be between 0 and " + MAX_FILES_PER_DIRECTORY + ".");
         }
     }
 
-    private Path resolveAndValidateBasePath(String requestedBasePath) {
-        Path resolvedBasePath = Path.of(requestedBasePath).toAbsolutePath().normalize();
+    private Path resolveBasePath(String requestedBasePath) {
+        try {
+            Path realInputRoot = inputRoot.toRealPath().normalize();
+            Path basePath = Path.of(requestedBasePath).toRealPath().normalize();
 
-        if (!resolvedBasePath.startsWith(inputRoot)) {
-            throw new IllegalArgumentException("Base path must be under input root: " + inputRoot);
+            if (!basePath.startsWith(realInputRoot)) {
+                throw new IllegalArgumentException("Base path must be under input root: " + realInputRoot);
+            }
+
+            if (!Files.isDirectory(basePath)) {
+                throw new IllegalArgumentException("Base path must be an existing directory: " + requestedBasePath);
+            }
+
+            return basePath;
+        } catch (IOException e) {
+            throw new IllegalArgumentException("Base path does not exist or cannot be accessed: " + requestedBasePath);
         }
-
-        if (!Files.exists(resolvedBasePath)) {
-            throw new IllegalArgumentException("Base path does not exist: " + requestedBasePath);
-        }
-
-        if (!Files.isDirectory(resolvedBasePath)) {
-            throw new IllegalArgumentException("Base path is not a directory: " + requestedBasePath);
-        }
-
-        return resolvedBasePath;
     }
 
     private String toAlphabeticName(int number) {
@@ -137,8 +114,7 @@ public class FileGenerationService {
 
         while (number > 0) {
             number--;
-            char letter = (char) ('a' + (number % 26));
-            result.insert(0, letter);
+            result.insert(0, (char) ('a' + number % 26));
             number /= 26;
         }
 

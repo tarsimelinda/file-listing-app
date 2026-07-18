@@ -45,17 +45,21 @@ public class HistoryService {
     public List<HistoryResponse> getHistory() {
         return queryHistoryRepository.findAll()
                 .stream()
-                .map(history -> new HistoryResponse(
-                        history.getId(),
-                        history.getRunUser(),
-                        history.getRunUid(),
-                        history.getRunGid(),
-                        history.getRequestedPath(),
-                        history.getExtension(),
-                        history.getRequestedAt(),
-                        history.getResultCount(),
-                        history.getStatus()
-                ))
+                .map(this::toResponse)
                 .toList();
+    }
+
+    private HistoryResponse toResponse(QueryHistory history) {
+        return new HistoryResponse(
+                history.getId(),
+                history.getRunUser(),
+                history.getRunUid(),
+                history.getRunGid(),
+                history.getRequestedPath(),
+                history.getExtension(),
+                history.getRequestedAt(),
+                history.getResultCount(),
+                history.getStatus()
+        );
     }
 }
