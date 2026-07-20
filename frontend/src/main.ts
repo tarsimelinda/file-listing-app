@@ -29,6 +29,26 @@ type HistoryItem = {
   status: string;
 };
 
+type ScanRequest = {
+  basePath: string;
+  signature: string;
+  extension: string;
+};
+
+type ScanMatch = {
+  fileName: string;
+  relativePath: string;
+};
+
+type ScanResponse = {
+  requestedPath: string;
+  signature: string;
+  extension: string;
+  scannedFiles: number;
+  matchedFiles: number;
+  matches: ScanMatch[];
+};
+
 document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
   <main class="container">
     <h1>File Listing App</h1>
@@ -81,6 +101,30 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
     </section>
 
     <section class="card">
+      <h2>Scan files</h2>
+
+      <label>
+        Base path
+        <input id="scanBasePath" value="/input" />
+      </label>
+
+      <label>
+        Signature
+        <input id="scanSignature" placeholder="SECRET_KEY" />
+      </label>
+
+      <label>
+        Extension
+        <input id="scanExtension" value="txt" />
+      </label>
+
+      <button id="scanButton">Scan files</button>
+
+      <p id="scanMessage"></p>
+      <div id="scanResults"></div>
+    </section>
+
+    <section class="card">
       <h2>History</h2>
 
       <button id="historyButton">Load history</button>
@@ -90,6 +134,8 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
           <tr>
             <th>ID</th>
             <th>User</th>
+            <th>UID</th>
+            <th>GID</th>
             <th>Path</th>
             <th>Extension</th>
             <th>Count</th>
@@ -105,10 +151,12 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
 
 const generateButton = document.querySelector<HTMLButtonElement>('#generateButton')!;
 const listButton = document.querySelector<HTMLButtonElement>('#listButton')!;
+const scanButton = document.querySelector<HTMLButtonElement>('#scanButton')!;
 const historyButton = document.querySelector<HTMLButtonElement>('#historyButton')!;
 
 generateButton.addEventListener('click', generateStructure);
 listButton.addEventListener('click', listFiles);
+scanButton.addEventListener('click', scanFilesFromForm);
 historyButton.addEventListener('click', loadHistory);
 
 async function generateStructure(): Promise<void> {
@@ -153,8 +201,7 @@ async function listFiles(): Promise<void> {
     const response = await fetch(`${API_BASE_URL}/api/list?path=${path}&extension=${extension}`);
 
     if (!response.ok) {
-      const errorText = await response.text();
-      document.querySelector<HTMLParagraphElement>('#fileCount')!.textContent = errorText;
+      showError('fileCount', await response.text());
       return;
     }
 
@@ -172,8 +219,55 @@ async function listFiles(): Promise<void> {
       fileList.appendChild(listItem);
     });
   } catch (error) {
-    document.querySelector<HTMLParagraphElement>('#fileCount')!.textContent = String(error);
+    showError('fileCount', String(error));
   }
+}
+
+async function scanFilesFromForm(): Promise<void> {
+  const basePath = getInputValue('scanBasePath') || '/input';
+  const signature = getInputValue('scanSignature');
+  const extension = getInputValue('scanExtension') || 'txt';
+
+  if (!signature) {
+    showScanMessage('Signature must not be empty.', true);
+    return;
+  }
+
+  try {
+    showScanMessage('Scanning files...', false);
+    clearScanResults();
+
+    const result = await scanFiles({
+      basePath,
+      signature,
+      extension
+    });
+
+    showScanMessage(
+      `Scanned ${result.scannedFiles} file(s), found ${result.matchedFiles} match(es).`,
+      false
+    );
+
+    renderScanResults(result);
+  } catch (error) {
+    showScanMessage(error instanceof Error ? error.message : 'Scan failed.', true);
+  }
+}
+
+async function scanFiles(request: ScanRequest): Promise<ScanResponse> {
+  const response = await fetch(`${API_BASE_URL}/api/scan`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(request)
+  });
+
+  if (!response.ok) {
+    throw new Error(await response.text());
+  }
+
+  return response.json();
 }
 
 async function loadHistory(): Promise<void> {
@@ -195,6 +289,8 @@ async function loadHistory(): Promise<void> {
 
       appendTableCell(row, item.id);
       appendTableCell(row, item.runUser);
+      appendTableCell(row, item.runUid);
+      appendTableCell(row, item.runGid);
       appendTableCell(row, item.requestedPath);
       appendTableCell(row, item.extension);
       appendTableCell(row, item.resultCount);
@@ -209,11 +305,54 @@ async function loadHistory(): Promise<void> {
 }
 
 function getInputValue(id: string): string {
-  return document.querySelector<HTMLInputElement>(`#${id}`)!.value;
+  return document.querySelector<HTMLInputElement>(`#${id}`)?.value.trim() ?? '';
 }
 
 function showError(elementId: string, message: string): void {
   document.querySelector<HTMLElement>(`#${elementId}`)!.textContent = message;
+}
+
+function showScanMessage(message: string, isError: boolean): void {
+  const scanMessage = document.querySelector<HTMLParagraphElement>('#scanMessage')!;
+
+  scanMessage.textContent = message;
+  scanMessage.className = isError ? 'error-message' : 'success-message';
+}
+
+function clearScanResults(): void {
+  document.querySelector<HTMLDivElement>('#scanResults')!.replaceChildren();
+}
+
+function renderScanResults(result: ScanResponse): void {
+  const scanResults = document.querySelector<HTMLDivElement>('#scanResults')!;
+  scanResults.replaceChildren();
+
+  if (result.matches.length === 0) {
+    const message = document.createElement('p');
+    message.textContent = 'No matching files found.';
+    scanResults.appendChild(message);
+    return;
+  }
+
+  const list = document.createElement('ul');
+
+  result.matches.forEach((match) => {
+    const listItem = document.createElement('li');
+
+    const fileName = document.createElement('strong');
+    fileName.textContent = match.fileName;
+
+    const relativePath = document.createElement('span');
+    relativePath.textContent = match.relativePath;
+
+    listItem.appendChild(fileName);
+    listItem.appendChild(document.createElement('br'));
+    listItem.appendChild(relativePath);
+
+    list.appendChild(listItem);
+  });
+
+  scanResults.appendChild(list);
 }
 
 function appendTableCell(row: HTMLTableRowElement, value: string | number): void {

@@ -79,3 +79,19 @@ td {
 th {
   background: #eee;
 }
+
+.success-message {
+  color: #166534;
+}
+
+.error-message {
+  color: #b91c1c;
+}
+
+#scanResults ul {
+  padding-left: 1.25rem;
+}
+
+#scanResults li {
+  margin-bottom: 0.75rem;
+}
